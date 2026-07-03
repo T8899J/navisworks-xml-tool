@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ruff_cache/
+
+# Build
+build/
+dist/
+*.spec
+
+# Packaging (local vendored deps)
+.packaging/
+
+# CodeGraph local data
+.codegraph/
+
+# IDE
+.vscode/
+.idea/

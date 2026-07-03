@@ -1,0 +1,9 @@
+{
+  "exclude": [
+    ".packaging/",
+    "build/",
+    "dist/",
+    "__pycache__/",
+    ".ruff_cache/"
+  ]
+}
