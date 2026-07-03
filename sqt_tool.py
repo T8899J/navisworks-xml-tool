@@ -9,6 +9,7 @@ import sys
 import tkinter as tk
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext
 
@@ -18,7 +19,7 @@ WINDOW_SIZE = "680x560"
 
 # ── 输入限制 ────────────────────────────────────────────────
 MAX_INPUT_LINES = 900
-MAX_LINE_LENGTH = 20
+MAX_LINE_LENGTH = 200
 
 # ── UI 颜色 ─────────────────────────────────────────────────
 COLOR_BG = "#f7f7f5"
@@ -43,6 +44,13 @@ FONT_INPUT = ("Microsoft YaHei UI", 12)
 DEFAULT_BRACKET_FILENAME = "SQT-M14-9.19.nwd"
 DEFAULT_COORD_FILENAME = "TS-M12(2)3.26.nwd"
 DEFAULT_COORD_FILEPATH = ""
+
+
+@dataclass(frozen=True)
+class CoordinateTemplateInfo:
+    filename: str
+    filepath: str = ""
+    warning_message: str | None = None
 
 
 # ── 路径工具函数 ────────────────────────────────────────────
@@ -222,6 +230,34 @@ def navisworks_xml(
     return ET.tostring(root, encoding="unicode", xml_declaration=True)
 
 
+def _truncate_lines_for_input(
+    text: str,
+    max_length: int = MAX_LINE_LENGTH,
+) -> str:
+    """将每一行截断到允许的最大字符数。"""
+    return "\n".join(line[:max_length] for line in text.split("\n"))
+
+
+def _apply_live_line_limit(text_widget: tk.Text) -> bool:
+    """实时约束输入框内容，确保任一行都不超过最大长度。"""
+    if getattr(text_widget, "_is_placeholder", False):
+        return False
+
+    raw = text_widget.get("1.0", "end-1c")
+    truncated = _truncate_lines_for_input(raw)
+    if raw == truncated:
+        return False
+
+    insert_index = text_widget.index(tk.INSERT)
+    line_str, col_str = insert_index.split(".")
+    clamped_index = f"{line_str}.{min(int(col_str), MAX_LINE_LENGTH)}"
+
+    text_widget.delete("1.0", tk.END)
+    text_widget.insert("1.0", truncated)
+    text_widget.mark_set(tk.INSERT, clamped_index)
+    return True
+
+
 def read_items(text_widget: tk.Text) -> list[str]:
     """从文本组件读取用户输入，按行分割并校验。
 
@@ -300,39 +336,44 @@ def write_bracket_xml(items: list[str]) -> None:
         return
 
     output_path = Path(save_path)
-
-    try:
-        content = generate_xml_content(
-            items, build_bracket_condition, DEFAULT_BRACKET_FILENAME
-        )
-        write_xml_file(content, output_path)
-    except OSError as exc:
-        messagebox.showerror("写入失败", f"无法生成文件：\n{exc}")
-        return
+    content = generate_xml_content(
+        items, build_bracket_condition, DEFAULT_BRACKET_FILENAME
+    )
+    write_xml_file(content, output_path)
 
 
-def load_coordinate_template_info() -> dict[str, str]:
+def load_coordinate_template_info() -> CoordinateTemplateInfo:
     """从坐标模板文件读取默认文件名和路径。"""
-    defaults: dict[str, str] = {
-        "filename": DEFAULT_COORD_FILENAME,
-        "filepath": DEFAULT_COORD_FILEPATH,
-    }
+    defaults = CoordinateTemplateInfo(
+        filename=DEFAULT_COORD_FILENAME,
+        filepath=DEFAULT_COORD_FILEPATH,
+    )
 
     coordinate_template = find_coordinate_template()
     if coordinate_template is None:
-        return defaults
+        return CoordinateTemplateInfo(
+            filename=defaults.filename,
+            filepath=defaults.filepath,
+            warning_message="未找到“坐标用.xml”，已使用默认模板参数。",
+        )
 
     try:
         parser = ET.XMLParser()
         parser.entity = {}  # 禁用外部实体解析（XXE 防护）
         root = ET.parse(coordinate_template, parser).getroot()
     except (OSError, ET.ParseError):
-        return defaults
+        return CoordinateTemplateInfo(
+            filename=defaults.filename,
+            filepath=defaults.filepath,
+            warning_message=(
+                f"无法读取模板“{coordinate_template.name}”，已使用默认模板参数。"
+            ),
+        )
 
-    return {
-        "filename": root.attrib.get("filename", defaults["filename"]),
-        "filepath": root.attrib.get("filepath", defaults["filepath"]),
-    }
+    return CoordinateTemplateInfo(
+        filename=root.attrib.get("filename", defaults.filename),
+        filepath=root.attrib.get("filepath", defaults.filepath),
+    )
 
 
 def write_coordinate_xml(items: list[str]) -> None:
@@ -347,18 +388,16 @@ def write_coordinate_xml(items: list[str]) -> None:
 
     template = load_coordinate_template_info()
     output_path = Path(save_path)
+    content = generate_xml_content(
+        items,
+        build_coordinate_condition,
+        template.filename,
+        template.filepath,
+    )
+    write_xml_file(content, output_path)
 
-    try:
-        content = generate_xml_content(
-            items,
-            build_coordinate_condition,
-            template["filename"],
-            template["filepath"],
-        )
-        write_xml_file(content, output_path)
-    except OSError as exc:
-        messagebox.showerror("写入失败", f"无法生成文件：\n{exc}")
-        return
+    if template.warning_message:
+        messagebox.showwarning("模板提醒", template.warning_message)
 
 
 # ── UI 构建 ────────────────────────────────────────────────
@@ -616,10 +655,15 @@ def _build_input_area(parent: tk.Frame) -> scrolledtext.ScrolledText:
             text._is_placeholder = True
         _refresh_stats()
 
+    def _sync_input_feedback() -> None:
+        if _apply_live_line_limit(text):
+            text.bell()
+        _refresh_stats()
+
     text.bind("<FocusIn>", _on_focus_in)
     text.bind("<FocusOut>", _on_focus_out)
-    text.bind("<KeyRelease>", lambda _: _refresh_stats(), add=True)
-    text.bind("<<Paste>>", lambda _: text.after(10, _refresh_stats), add=True)
+    text.bind("<KeyRelease>", lambda _: _sync_input_feedback(), add=True)
+    text.bind("<<Paste>>", lambda _: text.after(10, _sync_input_feedback), add=True)
 
     return text
 
