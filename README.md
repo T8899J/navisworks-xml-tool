@@ -1,226 +1,115 @@
-# 单枪项目 README
+# 傑出品 — Navisworks XML 生成工具
 
 ![Python](https://img.shields.io/badge/Python-3.12+-blue?logo=python)
 ![Tkinter](https://img.shields.io/badge/UI-Tkinter-green)
 ![Navisworks](https://img.shields.io/badge/Navisworks-Manage%202023-orange)
+![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey?logo=windows)
 
-## 项目概述
+桌面工具，把人工输入的查询值批量生成 Autodesk Navisworks 可读取的 exchange XML 查询文件。支持**支架查询**和**坐标查询**两种模式。
 
-这是一个围绕 Navisworks 检索流程搭建的单枪项目，当前由两部分组成：
+> 配套的 Navisworks 查找插件在 [`T8899J/navisworks-plugin`](https://github.com/T8899J/navisworks-plugin)。
 
-1. `sqt_tool.py`
-   负责把人工输入的查询值批量生成 Navisworks 可读取的 XML 查询文件。
-2. `navisworks-plugin-work/`
-   负责在 Navisworks Manage 2023 中读取 XML、执行搜索、选中对象、保留结构节点，并按需隐藏未选中对象。
+---
 
-当前工作重点已经从“只生成 XML”推进到“生成 XML + 在 Navisworks 内执行完整查找流程”。
+## 快速开始
 
-## 当前进展
-
-### 已完成
-
-- Python 桌面工具已可稳定生成两类 XML：
-  - 支架查询 XML
-  - 坐标查询 XML
-- XML 生成工具已补齐基础输入保护：
-  - 最大 900 行输入限制
-  - 单行最大 200 字符限制
-  - XML 非法控制字符清理
-- Navisworks 插件已具备完整 UI：
-  - 搜索条件页
-  - 选项页
-  - 结果页
-- 插件已支持：
-  - 导入 XML 查询条件
-  - 手动添加 / 删除 / 清空条件
-  - 执行 XML 搜索
-  - 将结果写入 Navisworks 当前选择
-  - 导出搜索结果
-- 插件已实现“搜索范围”机制：
-  - 读取用户在选择树中提前选中的蓝色节点
-  - 将其作为搜索范围使用
-- 插件已实现动态结构保护逻辑：
-  - 从当前搜索范围自动识别模型前缀
-  - 自动推导对应的 `*-STR` 节点名称
-  - 将该结构节点及其子节点纳入最终保留集合
-- 插件已实现隐藏未选中对象：
-  - 最终保留集合写入 `CurrentSelection`
-  - 调用 Navisworks 内核选择反转与隐藏能力
-- 插件已加入诊断日志能力：
-  - 自动记录搜索范围
-  - XML 条件数量
-  - 选中数量
-  - 最终保留集合数量
-  - 隐藏执行情况
-  - 异常明细
-
-### 当前阶段
-
-当前项目已经进入“可用版本联调”阶段，核心业务链路已跑通：
-
-`输入查询值 -> 生成 XML -> 在 Navisworks 中执行搜索 -> 选中目标 -> 保留 STR -> 隐藏其他对象`
-
-### 正在持续调整
-
-- 搜索性能还在继续验证
-- 不同模型前缀场景仍在持续回归测试
-- 部分版本切换后需要重新编译和部署 DLL
-- 文档和脚本路径说明正在同步整理
-
-## 当前工作目录说明
-
-```text
-主函数/
-├─ sqt_tool.py                    # Python XML 生成工具
-├─ 运行新版工具.bat                # Python 工具启动脚本
-├─ README.md                      # 当前说明文档
-├─ 审查报告.md                     # 早期代码审查记录
-├─ navisworks-plugin-work/        # 当前主开发目录
-│  ├─ PluginEntry.cs              # 插件入口
-│  ├─ SearchDialog.cs             # 主界面与搜索流程
-│  ├─ ModelItemMatcher.cs         # Navisworks 搜索封装
-│  ├─ XmlSearchParser.cs          # XML 解析
-│  ├─ SelectionService.cs         # 选择写入
-│  ├─ HideServiceFixed.cs         # 隐藏未选中对象
-│  ├─ ProtectedKeepService.cs     # 结构节点保护
-│  ├─ LogService.cs               # 诊断日志
-│  ├─ build_2023.bat              # 编译脚本
-│  ├─ install_2023.bat            # 安装脚本
-│  └─ README.md                   # 插件说明
-├─ build/                         # PyInstaller 构建目录
-├─ dist/                          # Python 工具打包输出
-└─ .packaging/                    # 打包依赖
-```
-
-## Python XML 工具
-
-### 作用
-
-把输入的编号、坐标或路径类查询值批量转换成 Navisworks 可直接读取的 XML 查询文件。
-
-### 启动方式
-
-直接运行：
+### 直接运行（需 Python 3.12+）
 
 ```bash
+pip install -r requirements.txt
 python sqt_tool.py
 ```
 
-或在 Windows 下双击：
+或双击 `运行新版工具.bat`。
 
-```text
-运行新版工具.bat
-```
+### 打包成 exe
 
-### 当前特点
-
-- 使用 Tkinter 实现桌面界面
-- 自动调用系统“另存为”窗口
-- 记住上一次保存目录
-- 可复用坐标查询模板文件
-
-## Navisworks 插件
-
-### 目标环境
-
-- Navisworks Manage 2023
-- .NET Framework 4.8
-- Windows
-
-### 当前插件能力
-
-- 读取 XML 查询条件
-- 支持 `equals` / `contains`
-- 根据选择树当前蓝色选中节点确定搜索范围
-- 自动识别模型前缀，如：
-  - `TS-M12`
-  - `TS-M14`
-  - `TS-M25`
-- 自动推导并保护对应的 `*-STR` 节点
-- 支持两种执行模式：
-  - 模式 A：仅查找并选中，不隐藏
-  - 模式 B：查找并选中后，确认再隐藏未选中
-- 自动生成诊断日志，便于排查“选中了但没隐藏”“隐藏过度”“搜索过慢”等问题
-
-### 编译
+用 PyInstaller 打包为独立的 Windows exe，无需 Python 环境即可运行：
 
 ```bash
-navisworks-plugin-work\build_2023.bat
+pyinstaller 傑出品.spec
 ```
 
-或直接调用 MSBuild：
+产物在 `dist/傑出品.exe`。
 
-```bash
-MSBuild.exe navisworks-plugin-work\NavisworksPlugin.csproj /p:Configuration=Release /t:Rebuild /v:m
+---
+
+## 界面
+
+```
+┌──────────────────────────────────────┐
+│  傑出品                               │
+├──────────────────────────────────────┤
+│  每行输入一个查询值      [查支架][查坐标] │
+├──────────────────────────────────────┤
+│                                      │
+│  输入区（每行一个值，最多 900 行）      │
+│  每行上限 20 字符                      │
+│                                      │
+├──────────────────────────────────────┤
+│  N 行                        [清空]   │
+└──────────────────────────────────────┘
 ```
 
-### 部署
+- **查支架** — 生成 `equals` 匹配的支架查询 XML
+- **查坐标** — 生成 `contains` 匹配的坐标查询 XML
+- 底部实时显示有内容的行数（第一性原理统计）
+- 输入区带占位符、清空按钮、行数/长度校验
 
-插件 DLL 当前部署目录为：
+---
 
-```text
-F:\Navisworks\Navisworks Manage 2023\Plugins\傑出品NavisworksPlugin\
+## 生成示例
+
+支架查询 XML：
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<exchange units="m" filename="SQT-M14-9.19.nwd">
+  <findspec mode="all" disjoint="0">
+    <conditions>
+      <condition test="equals" flags="74">
+        <property>
+          <name internal="LcOaSceneBaseUserName">名称</name>
+        </property>
+        <value>
+          <data type="wstring">查询值</data>
+        </value>
+      </condition>
+    </conditions>
+    <locator>/</locator>
+  </findspec>
+</exchange>
 ```
 
-典型文件包括：
+---
 
-```text
-傑出品NavisworksPlugin.dll
-傑出品NavisworksPlugin.plugin
+## 项目文件
+
+```
+navisworks-xml-tool/
+├── sqt_tool.py              # 主程序
+├── 傑出品.spec               # PyInstaller 打包配置
+├── 运行新版工具.bat           # 快捷启动脚本
+├── codegraph.json            # CodeGraph 索引配置
+├── README.md                 # 本文件
+├── 审查报告.md                # 代码审查记录
+└── 坐标用.xml                 # 坐标查询模板（可选）
 ```
 
-如果 Navisworks 正在运行，DLL 可能被占用，部署会失败。此时需要先关闭 Navisworks 再覆盖。
+---
 
-## 诊断日志
+## 技术栈
 
-当前插件支持自动输出诊断日志，优先写到 XML 同级目录。
+- **语言**: Python 3.12+
+- **UI 框架**: Tkinter（标准库）
+- **XML 生成**: `xml.etree.ElementTree`
+- **打包工具**: PyInstaller 6.20+
+- **外部依赖**: 无（仅用标准库）
 
-文件名格式：
+---
 
-```text
-<xml文件名>_诊断日志_yyyyMMdd_HHmmss.txt
-```
+## 相关仓库
 
-日志会记录：
-
-- 当前模型文件名
-- XML 路径
-- XML 条件数量
-- 搜索范围数量
-- 命中对象数量
-- 结构保护节点匹配情况
-- 写入 `CurrentSelection` 前后数量
-- 隐藏执行方式
-- 异常完整堆栈
-
-## 当前已验证的业务规则
-
-当前插件围绕以下目标工作：
-
-- 用户先在选择树中框定蓝色搜索范围
-- 插件只根据 XML 命中结果保留需要的对象
-- 自动保留当前模型对应的 `*-STR` 结构节点
-- 最终只显示：
-  - 搜索范围内命中的对象
-  - 当前模型对应的 `*-STR` 节点
-
-## 已知注意事项
-
-- 搜索性能与模型大小、XML 条件数量、搜索范围大小直接相关
-- 某些版本切换后，部署目录中的 DLL 可能与工作目录源码不一致，发布前需要重新编译并覆盖
-- 当前项目主要围绕 Navisworks Manage 2023 调试，不承诺兼容其他版本
-- 部分旧文档和脚本仍保留历史命名，后续会逐步统一
-
-## 下一步计划
-
-- 继续稳定搜索性能
-- 继续压缩版本切换时的回滚成本
-- 继续补正文档和部署说明
-- 在业务逻辑稳定后，再做更系统的代码清理与结构优化
-
-## 相关文件
-
-- [根目录审查报告](D:/副业/项目/主函数/审查报告.md)
-- [插件说明](D:/副业/项目/主函数/navisworks-plugin-work/README.md)
-- [Python 工具入口](D:/副业/项目/主函数/sqt_tool.py)
-
+| 仓库 | 说明 |
+|------|------|
+| [`navisworks-xml-tool`](https://github.com/T8899J/navisworks-xml-tool) | 本工具 — XML 生成 |
+| [`navisworks-plugin`](https://github.com/T8899J/navisworks-plugin) | Navisworks 查找插件（C# .NET） |
